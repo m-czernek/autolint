@@ -1,17 +1,12 @@
 #!/bin/env python3
-import os
 import subprocess
-import sys
 
 FILE = "./yum_src.py"
 PYLINTRC = "./pylintrc"
 
 def main():
-    with open("out.log", "w", encoding="UTF8") as f:
-        #execute_cmd(["black", FILE], f)
-        pass
     output = None
-    try:    
+    try:
         output = subprocess.check_output([
             "pylint",
             "--msg-template='{line:3d}:{symbol}'",
@@ -31,8 +26,10 @@ def autofix_file(pylint_map):
     with open(FILE, "r+", encoding="UTF8") as f:
         lines = f.readlines()
         for i, line in enumerate(lines):
-            if i + 1 in pylint_map:
-                line = f"{line} #  pylint: disable={pylint_map[i+1]}"
+            line_num = str(i + 1)
+            if line_num in pylint_map:
+                new_line = f"{line.rstrip()} #  pylint: disable={pylint_map[line_num]}\n"
+                lines[i] = new_line
         f.seek(0)
         for line in lines:
             f.write(line)
