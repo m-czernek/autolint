@@ -8,6 +8,7 @@ pylint reports on that file.
 import click
 import subprocess
 
+# TODO: refactor to pass the file as an argument
 FILE = "./yum_src.py"
 PYLINTRC = "./pylintrc"
 
@@ -97,6 +98,7 @@ def execute_black(target_version):
     return subprocess.Popen(
         cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
+
 
 if __name__ == "__main__":
     main()

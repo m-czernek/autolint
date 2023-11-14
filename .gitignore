@@ -1,2 +1,5 @@
 .venv
 .vscode
+# vim autosave and undo modes
+*~
+*.un~
