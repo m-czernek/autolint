@@ -13,7 +13,7 @@ FILE = "./yum_src.py"
 PYLINTRC = "./pylintrc"
 
 
-@click.version_option("0.1.0", prog_name="autoblack")
+@click.version_option("0.1.0", prog_name="autolint")
 @click.command("main")
 @click.option("-p", "--pylintrc", "pylintrc", type=click.File(mode="r"), default=None)
 @click.option(
