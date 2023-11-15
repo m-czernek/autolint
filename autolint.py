@@ -7,10 +7,7 @@ pylint reports on that file.
 """
 import click
 import subprocess
-
-# TODO: refactor to pass the file as an argument
-FILE = "./yum_src.py"
-PYLINTRC = "./pylintrc"
+from pathlib import Path
 
 
 @click.version_option("0.1.0", prog_name="autolint")
@@ -35,22 +32,45 @@ PYLINTRC = "./pylintrc"
         ]
     ),
 )
-def main(pylintrc, target_version):
-    execute_black(target_version)
-    pylint_output = get_pylint_output(pylintrc)
-    pylint_map = parse_pylint_out(pylint_output)
-    autofix_file(pylint_map)
+@click.argument(
+    "paths",
+    nargs=-1,
+    type=click.Path(
+        exists=True,
+        file_okay=True,
+        readable=True,
+        path_type=Path,
+    ),
+)
+def main(paths, pylintrc, target_version):
+    execute_black(paths, target_version)
+
+    files = recursively_parse_files(paths)
+
+    for file in files:
+        pylint_output = get_pylint_output(pylintrc, file)
+        pylint_map = parse_pylint_out(pylint_output)
+        autofix_file(pylint_map, file)
 
 
-def get_pylint_output(pylintrc):
+def recursively_parse_files(paths):
+    files = []
+    for path in paths:
+        if path.is_file():
+            files.append(path)
+            continue
+        files.extend(path.rglob("*.py"))
+    return files
+
+
+def get_pylint_output(pylintrc, file):
     try:
         output = subprocess.check_output(
             [
                 "pylint",
                 "--msg-template='{line:3d}:{symbol}'",
-                "--rcfile",
-                PYLINTRC,
-                FILE,
+                f"--rcfile {pylintrc}" if pylintrc else "",
+                file,
             ],
             stderr=subprocess.STDOUT,
             text=True,
@@ -61,10 +81,10 @@ def get_pylint_output(pylintrc):
     return output
 
 
-def autofix_file(pylint_map):
+def autofix_file(pylint_map, file):
     if not bool(pylint_map):
         return
-    with open(FILE, "r+", encoding="UTF8") as f:
+    with open(file, "r+", encoding="UTF8") as f:
         lines = f.readlines()
         for i, line in enumerate(lines):
             line_num = str(i + 1)
@@ -91,13 +111,13 @@ def parse_pylint_out(pylint_out):
     return res
 
 
-def execute_black(target_version):
-    cmd = ["black", FILE]
+def execute_black(paths, target_version):
+    cmd = ["black"]
     if target_version:
         cmd.extend(["-t", target_version])
-    return subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
+    cmd.extend(paths)
+
+    subprocess.run(cmd, check=False)
 
 
 if __name__ == "__main__":
