@@ -12,7 +12,12 @@ from pathlib import Path
 
 @click.version_option("0.1.0", prog_name="autolint")
 @click.command("main")
-@click.option("-p", "--pylintrc", "pylintrc", type=click.File(mode="r"), default=None)
+@click.option("-p", "--pylintrc", "pylintrc", default=None, type=click.Path(
+        exists=True,
+        file_okay=True,
+        readable=True,
+        path_type=Path,
+    ))
 @click.option(
     "-t",
     "--target-version",
@@ -43,7 +48,7 @@ from pathlib import Path
     ),
 )
 def main(paths, pylintrc, target_version):
-    execute_black(paths, target_version)
+#    execute_black(paths, target_version)
 
     files = recursively_parse_files(paths)
 
@@ -64,14 +69,15 @@ def recursively_parse_files(paths):
 
 
 def get_pylint_output(pylintrc, file):
-    try:
-        output = subprocess.check_output(
-            [
+    cmd = [
                 "pylint",
                 "--msg-template='{line:3d}:{symbol}'",
                 f"--rcfile {pylintrc}" if pylintrc else "",
                 file,
-            ],
+            ]
+    try:
+        output = subprocess.check_output(
+            cmd,
             stderr=subprocess.STDOUT,
             text=True,
         )
@@ -83,26 +89,40 @@ def get_pylint_output(pylintrc, file):
 
 def autofix_file(pylint_map, file):
     if not bool(pylint_map):
+        print(f"Empty map for {file}, returning")
         return
-    with open(file, "r+", encoding="UTF8") as f:
-        lines = f.readlines()
-        for i, line in enumerate(lines):
-            line_num = str(i + 1)
-            if line_num in pylint_map:
-                new_line = (
-                    f"{line.rstrip()} #  pylint: disable={pylint_map[line_num]}\n"
-                )
-                lines[i] = new_line
-        f.seek(0)
-        for line in lines:
-            f.write(line)
+    try:
+        with open(file, "r+", encoding="UTF-8") as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                line_num = str(i + 1)
+                if line_num in pylint_map:
+                    line = line.rstrip()
+                    if line.endswith(pylint_map[line_num]) or pylint_map[line_num] in line or '"""' in line or line.endswith('\\'):
+                        new_line = f"{line}\n"
+                    elif "pylint: disable=" in line:
+                        new_line = f"{line},{pylint_map[line_num]}\n"
+                    else:
+                        if line.startswith("#") and not line.startswith("#!"):
+                            new_line = f"{line} pylint: disable={pylint_map[line_num]}\n"
+                        else:
+                            new_line = (
+                                    f"{line}  #  pylint: disable={pylint_map[line_num]}\n"
+                            )
+                    lines[i] = new_line
+            f.seek(0)
+            for line in lines:
+                f.write(line)
+    except Exception as e:
+        print(f"Could not fix {file}")
+        print(e)
 
 
 def parse_pylint_out(pylint_out):
     res = {}
     for line in pylint_out.split("\n"):
         line = line.strip()
-        if line and line[0].isdigit():
+        if line and line[0].isdigit() and 'fatal' not in line:
             num, err = line.split(":")
             if num in res:
                 res[num] = f"{res[num]},{err}"
