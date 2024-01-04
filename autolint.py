@@ -94,22 +94,16 @@ def autofix_file(pylint_map, file):
     try:
         with open(file, "r+", encoding="UTF-8") as f:
             lines = f.readlines()
-            for i, line in enumerate(lines):
-                line_num = str(i + 1)
-                if line_num in pylint_map:
-                    line = line.rstrip()
-                    if line.endswith(pylint_map[line_num]) or pylint_map[line_num] in line or '"""' in line or line.endswith('\\'):
-                        new_line = f"{line}\n"
-                    elif "pylint: disable=" in line:
-                        new_line = f"{line},{pylint_map[line_num]}\n"
-                    else:
-                        if line.startswith("#") and not line.startswith("#!"):
-                            new_line = f"{line} pylint: disable={pylint_map[line_num]}\n"
-                        else:
-                            new_line = (
-                                    f"{line}  #  pylint: disable={pylint_map[line_num]}\n"
-                            )
-                    lines[i] = new_line
+            for line_num,pylint_val in sorted(pylint_map.items(), key=lambda kv:int(kv[0]), reverse=True):
+                # arrays are 0-indexed, pylint-out is 1-indexed
+                line_num_i = int(line_num) - 1
+                curr_line = lines[line_num_i]
+                num_of_spaces = len(curr_line) - len(curr_line.lstrip())
+                new_line = ''.rjust(num_of_spaces)
+                new_line = f"{new_line}#  pylint: disable-next={pylint_val}\n"
+                if line_num_i == 0:
+                    new_line = new_line.replace("-next", "")
+                lines.insert(line_num_i, new_line)
             f.seek(0)
             for line in lines:
                 f.write(line)
